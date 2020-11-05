@@ -4,7 +4,7 @@ import java.net.{Socket, URLDecoder}
 
 import sysdes.formapp.server.{Handler, Server}
 
-object StatelessServer extends Server(8000) {  //ポート番号を変更
+object StatelessServer extends Server(8001) {  //ポート番号を変更
   override def getHandler(socket: Socket) = new StatelessServerHandler(socket)
 }
 
@@ -26,6 +26,7 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
 
   /* 1.スタート画面 */
   def index(): Response = {
+
     Ok("""<html lang="ja">
         |<head>
         |    <meta charset="UTF-8">
@@ -60,9 +61,9 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
 
   /* 3.性別入力画面 */
   def gender(body: String): Response = {
-    System.out.println("gender")
-    System.out.println(body)
-    val parameters: Array[String] = body.split("=")
+    val parameters: Array[String] = body.split("[=&]")
+    var name: String = "No Name"
+    if(parameters.size==2) name = parameters(1)
 
     Ok(
       s"""<html lang="ja">
@@ -71,9 +72,9 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
         |</head>
         |<body>
         |    <form action="/message" method="post">
-        |    <input type="hidden" name="name" value="${URLDecoder.decode(parameters(1),"UTF-8")}">
+        |    <input type="hidden" name="name" value="${URLDecoder.decode(name,"UTF-8")}">
         |    性別：
-        |    <input type="radio" name="gender" value="male"> 男性
+        |    <input type="radio" name="gender" value="male" checked> 男性
         |    <input type="radio" name="gender" value="female"> 女性<br>
         |    <input type="submit" value="next"/>
         |    </form>
@@ -83,9 +84,9 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
 
   /* 4.メッセージ入力画面 */
   def message(body: String): Response = {
-    System.out.println("message")
-    System.out.println(body)
     val parameters: Array[String] = body.split("[=&]")
+    val name: String = parameters(1)
+    val gender: String = parameters(3)
 
     Ok(
       s"""<html lang="ja">
@@ -95,8 +96,8 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
         |
         |<body>
         |    <form action="/confirm" method="post">
-        |    <input type="hidden" name="name" value="${URLDecoder.decode(parameters(1),"UTF-8")}">
-        |    <input type="hidden" name="gender" value="${parameters(3)}">
+        |    <input type="hidden" name="name" value="${URLDecoder.decode(name,"UTF-8")}">
+        |    <input type="hidden" name="gender" value="${URLDecoder.decode(gender,"UTF-8")}">
         |    メッセージ：<br>
         |    <textarea name="message" placeholder="メッセージを入力"></textarea><br>
         |    <input type="submit" value="next" />
@@ -108,6 +109,10 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
   /* 5.確認画面 */
   def confirm(body: String): Response = {
     val parameters: Array[String] = body.split("[=&]")
+    val name: String = parameters(1)
+    val gender: String = parameters(3)
+    var message: String = "No Message"
+    if(parameters.size==6) message = parameters(5)
 
     Ok(
       s"""<html lang="ja">
@@ -116,9 +121,9 @@ class StatelessServerHandler(socket: Socket) extends Handler(socket) {
         |</head>
         |
         |<body>
-        |    名前：${URLDecoder.decode(parameters(1),"UTF-8")}<br>
-        |    性別：${URLDecoder.decode(parameters(3),"UTF-8")}<br>
-        |    メッセージ：${URLDecoder.decode(parameters(5),"UTF-8")}<br>
+        |    名前：${URLDecoder.decode(name,"UTF-8")}<br>
+        |    性別：${URLDecoder.decode(gender,"UTF-8")}<br>
+        |    メッセージ：${URLDecoder.decode(message,"UTF-8")}<br>
         |    <form action="/complete" method="post">
         |        <input type="submit" value="submit"/>
         |    </form>

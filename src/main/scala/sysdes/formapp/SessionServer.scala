@@ -1,7 +1,13 @@
 package sysdes.formapp
 
-import java.net.Socket
+import java.net.{Socket, URLDecoder}
+import java.util
+import java.util.UUID
+
+import sysdes.formapp.SessionServerHandler.{states}
 import sysdes.formapp.server.{Handler, Server}
+
+import scala.collection.mutable.HashMap
 
 object SessionServer extends Server(8002) {
   override def getHandler(socket: Socket) = new SessionServerHandler(socket)
@@ -9,24 +15,158 @@ object SessionServer extends Server(8002) {
 
 object SessionServerHandler {
   // インスタンス間で共有する内部状態に関する変数・関数はこの中に記述
+  val states = HashMap[UUID, State]()
 }
+
+//名前、性別、メッセージを保存するオブジェクト
+class State(var name:String, var gender: String, var message: String)
 
 class SessionServerHandler(socket: Socket) extends Handler(socket) {
   import sysdes.formapp.server.{NotFound, Ok, Request, Response}
-
   def handle(request: Request): Response = request match {
     case Request("GET", "/", _, _, _) => index()
+    case Request("POST", "/name", _, _, Some(body)) => name(body)
+    case Request("POST", "/gender", _, _, Some(body)) => gender(body)
+    case Request("POST", "/message", _, _, Some(body)) => message(body)
+    case Request("POST", "/confirm", _, _, Some(body)) => confirm(body)
+    case Request("POST", "/complete", _, _, _) => complete()
     case _                            => NotFound(s"Requested resource '${request.path}' for ${request.method} is not found.")
   }
 
+  //ステートをHashMapに追加
+  def createState(sessionID: UUID): Unit ={
+    states.addOne(sessionID,new State("No Name","male","No message"))
+  }
+
+  //ステートの取得
+  def getState(sessionID: UUID): State = {
+    states.apply(sessionID)
+  }
+
   def index(): Response = {
-    Ok("""<html>
+    val sessionID: UUID = UUID.randomUUID() //セッションキーの生成
+    createState(sessionID) //ステート(状態)インスタンスの生成
+
+    Ok(
+      s"""<html lang="ja">
+         |<head>
+         |    <meta charset="UTF-8">
+         |</head>
+         |
          |<body>
-         |    <form action="/register-name" method="post">
+         |    アンケート開始<br>
+         |    <form action="/name" method="post">
+         |        <input type="hidden" name="sessionID" value="${sessionID}">
          |        <input type="submit" value="start" />
          |    </form>
          |</body>
          |</html>""".stripMargin)
   }
 
+  /* 2.名前入力画面 */
+  def name(body: String): Response = {
+    val parameters: Array[String] = body.split("[=&]")
+    val sessionID = URLDecoder.decode(parameters(1),"UTF-8")
+
+    Ok(
+      s"""<html lang="ja">
+        |<head>
+        |    <meta charset="UTF-8">
+        |</head>
+        |
+        |<body>
+        |    <form action="/gender" method="post">
+        |    <input type="hidden" name="sessionID" value="${sessionID}">
+        |    名前：<input type="text" name="name"><br>
+        |    <input type="submit" value="next" />
+        |    </form>
+        |</body>
+        |</html>""".stripMargin)
+  }
+
+  /* 3.性別入力画面 */
+  def gender(body: String): Response = {
+    val parameters: Array[String] = body.split("[=&]")
+    val sessionID = UUID.fromString(URLDecoder.decode(parameters(1),"UTF-8"))
+    if(parameters.size==4) getState(sessionID).name = URLDecoder.decode(parameters(3),"UTF-8")
+
+    Ok(
+      s"""<html lang="ja">
+         |<head>
+         |    <meta charset="UTF-8">
+         |</head>
+         |<body>
+         |    <form action="/message" method="post">
+         |    <input type="hidden" name="sessionID" value="${sessionID}">
+         |    性別：
+         |    <input type="radio" name="gender" value="male" checked> 男性
+         |    <input type="radio" name="gender" value="female"> 女性<br>
+         |    <input type="submit" value="next"/>
+         |    </form>
+         |</body>
+         |</html>""".stripMargin)
+  }
+
+  /* 4.メッセージ入力画面 */
+  def message(body: String): Response = {
+    val parameters: Array[String] = body.split("[=&]")
+    val sessionID = UUID.fromString(URLDecoder.decode(parameters(1),"UTF-8"))
+    if(parameters.size==4) getState(sessionID).gender = URLDecoder.decode(parameters(3),"UTF-8")
+
+    Ok(
+      s"""<html lang="ja">
+         |<head>
+         |    <meta charset="UTF-8">
+         |</head>
+         |
+         |<body>
+         |    <form action="/confirm" method="post">
+         |    <input type="hidden" name="sessionID" value="${sessionID}">
+         |    メッセージ：<br>
+         |    <textarea name="message" placeholder="メッセージを入力"></textarea><br>
+         |    <input type="submit" value="next" />
+         |    </form>
+         |</body>
+         |</html>""".stripMargin)
+  }
+
+  /* 5.確認画面 */
+  def confirm(body: String): Response = {
+    val parameters: Array[String] = body.split("[=&]")
+    val sessionID = UUID.fromString(URLDecoder.decode(parameters(1),"UTF-8"))
+    if(parameters.size==4) getState(sessionID).message = URLDecoder.decode(parameters(3),"UTF-8")
+    val state: State = getState(sessionID)
+
+    Ok(
+      s"""<html lang="ja">
+         |<head>
+         |    <meta charset="UTF-8">
+         |</head>
+         |
+         |<body>
+         |    名前：${state.name}<br>
+         |    性別：${state.gender}<br>
+         |    メッセージ：${state.message}<br>
+         |    <form action="/complete" method="post">
+         |        <input type="submit" value="submit"/>
+         |    </form>
+         |</body>
+         |</html>""".stripMargin)
+  }
+
+  /*6.送信完了画面 */
+  def complete(): Response = {
+    System.out.println(states.size)  //インスタンス共有の確認
+    Ok(
+      s"""<html lang="ja">
+         |<head>
+         |    <meta charset="UTF-8">
+         |</head>
+         |
+         |<body>
+         |    送信が完了しました<br>
+         |    <a href="/">スタート画面へ戻る</a>
+         |</body>
+         |</html>""".stripMargin)
+  }
 }
