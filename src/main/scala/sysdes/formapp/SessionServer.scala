@@ -44,8 +44,19 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
     states.apply(sessionID)
   }
 
+  //クッキーからセッションIDを取得
+  def getSessionID(request: Request) : UUID = {
+    val Cookie = request.headers.get("Cookie").get.replaceAll(" ","") //空白除去
+    val Cookie_parameters = Cookie.split("[;=]")
+    var sessionID: UUID = null
+    for (i <- 0 to Cookie_parameters.size-1){
+      if (Cookie_parameters(i).equals("sessionID")) sessionID = UUID.fromString(Cookie_parameters(i+1))
+    }
+    return sessionID
+  }
+
   def index(): Response = {
-    val sessionID: UUID = UUID.randomUUID() //セッションキーの生成
+    val sessionID: UUID = UUID.randomUUID() //セッションIDの生成
     createState(sessionID) //ステート(状態)インスタンスの生成
     val response = Ok(
       s"""<html lang="ja">
@@ -83,18 +94,8 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
 
   /* 3.性別入力画面 */
   def gender(body: String,request: Request): Response = {
-    val Cookie = request.headers.get("Cookie").get.replaceAll(" ","") //空白除去
-    val Cookie_parameters = Cookie.split("[;=]")
     val parameters: Array[String] = body.split("[=&]")
-    var sessionID: UUID = null
-    //セッションキーの取り出し
-    for(i <- 0 to Cookie_parameters.size-1){
-      //System.out.println(i+parameters(i))
-      if(Cookie_parameters(i).equals("sessionID")) {
-        sessionID = UUID.fromString(Cookie_parameters(i+1))
-      }
-    }
-
+    val sessionID: UUID = getSessionID(request)  //クッキーからセッションIDを取得
     if(parameters.size==2) getState(sessionID).name = URLDecoder.decode(parameters(1),"UTF-8")
 
     Ok(
@@ -115,18 +116,8 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
 
   /* 4.メッセージ入力画面 */
   def message(body: String,request: Request): Response = {
-    val Cookie = request.headers.get("Cookie").get.replaceAll(" ","") //空白除去
-    val Cookie_parameters = Cookie.split("[;=]")
     val parameters: Array[String] = body.split("[=&]")
-    var sessionID: UUID = null
-    //セッションキーの取り出し
-    for(i <- 0 to Cookie_parameters.size-1){
-      //System.out.println(i+parameters(i))
-      if(Cookie_parameters(i).equals("sessionID")) {
-        sessionID = UUID.fromString(Cookie_parameters(i+1))
-      }
-    }
-
+    val sessionID: UUID = getSessionID(request)
     if(parameters.size==2) getState(sessionID).gender = URLDecoder.decode(parameters(1),"UTF-8")
 
     Ok(
@@ -147,18 +138,8 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
 
   /* 5.確認画面 */
   def confirm(body: String,request: Request): Response = {
-    val Cookie = request.headers.get("Cookie").get.replaceAll(" ","") //空白除去
-    val Cookie_parameters = Cookie.split("[;=]")
     val parameters: Array[String] = body.split("[=&]")
-    var sessionID: UUID = null
-    //セッションキーの取り出し
-    for(i <- 0 to Cookie_parameters.size-1){
-      //System.out.println(i+parameters(i))
-      if(Cookie_parameters(i).equals("sessionID")) {
-        sessionID = UUID.fromString(Cookie_parameters(i+1))
-      }
-    }
-
+    val sessionID: UUID = getSessionID(request)
     if(parameters.size==2) getState(sessionID).message = URLDecoder.decode(parameters(1),"UTF-8")
     val state: State = getState(sessionID)
 
@@ -181,7 +162,7 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
 
   /*6.送信完了画面 */
   def complete(): Response = {
-    System.out.println(states.size)  //インスタンス共有の確認
+    // System.out.println(states.size)  //インスタンス共有の確認
     Ok(
       s"""<html lang="ja">
          |<head>
