@@ -1,14 +1,13 @@
 package sysdes.formapp
 
+
 import java.net.{Socket, URLDecoder}
-import java.util
 import java.util.UUID
 
 import sysdes.formapp.SessionServerHandler.states
 import sysdes.formapp.server.{Handler, Server}
 
 import scala.collection.mutable.HashMap
-import scala.util.control.Breaks
 
 object SessionServer extends Server(8002) {
   override def getHandler(socket: Socket) = new SessionServerHandler(socket)
@@ -36,7 +35,7 @@ class SessionServerHandler(socket: Socket) extends Handler(socket) {
 
   //ステートをHashMapに追加
   def createState(sessionID: UUID): Unit ={
-    states.addOne(sessionID,new State("No Name","male","No message"))
+    states.addOne(sessionID,new State("No Name","male","No Message"))
   }
 
   //ステートの取得
